@@ -2,6 +2,7 @@ package com.locus.path.points.service.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import com.google.maps.DirectionsApi;
 import com.google.maps.DirectionsApiRequest;
@@ -9,7 +10,6 @@ import com.google.maps.DistanceMatrixApi;
 import com.google.maps.DistanceMatrixApiRequest;
 import com.google.maps.ElevationApi;
 import com.google.maps.GeoApiContext;
-import com.google.maps.errors.ApiException;
 import com.google.maps.model.DirectionsLeg;
 import com.google.maps.model.DirectionsResult;
 import com.google.maps.model.DirectionsRoute;
@@ -36,43 +36,23 @@ import lombok.extern.slf4j.Slf4j;
 public class PathPointServiceImpl implements PathPointService
 {
 
-    //@formatter:off
-    /*
     @Override
-    public List<LocationPoint> getAllPathPoints(LocationPoint source, LocationPoint destination)
+    public List<LatLng> getAllPointsUsingDirectionApi(LatLng source, LatLng destination)
     {
+        List<LatLng> pathPoints = new ArrayList<>();
+        pathPoints.add(source);
 
-        
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(GoogleMapsHelper.BASE_PATH);
-        builder.queryParam("origin", String.join(",", Arrays.asList(source.getLatitude(), source.getLogitude())));
-        builder.queryParam("destination", String.join(",", Arrays.asList(destination.getLatitude(), destination.getLogitude())));
-        builder.queryParam("key", GoogleMapsHelper.MAPS_API_KEY);
-        URI uri = builder.build().encode().toUri();
-        MapsResponse response = restTemplate.getForObject(uri, MapsResponse.class);
-        
-
-        return getIntermediatePoints(response);
-    }
-    */
-    //@formatter:on
-    public List<LatLng> getAllFuzzyPathPoints(LatLng source, LatLng destination)
-    {
-        List<LatLng> path = new ArrayList<>();
-        path.add(source);
-
-        // Execute Directions API request
-        GeoApiContext context = new GeoApiContext.Builder().apiKey(GoogleMapsHelper.MAPS_DIRECTION_API_KEY).build();
-        DirectionsApiRequest req = DirectionsApi.getDirections(context, source.lat + "," + source.lng, destination.lat + "," + destination.lng).units(Unit.METRIC);
+        GeoApiContext context = GoogleMapsHelper.getApiContext();
+        DirectionsApiRequest req = DirectionsApi.getDirections(context, source.lat + "," + source.lng, destination.lat + "," + destination.lng).units(Unit.METRIC).mode(TravelMode.DRIVING);
         try
         {
             DirectionsResult res = req.await();
-            // Loop through legs and steps to get encoded polylines of each step
-            if (res.routes != null && res.routes.length > 0)
+
+            if (Objects.nonNull(res.routes) && res.routes.length > 0)
             {
                 DirectionsRoute route = res.routes[0];
-                log.info(res.routes.toString());
                 LatLng prevPoint = source;
-                if (route.legs != null)
+                if (Objects.nonNull(route.legs))
                 {
                     for (int i = 0; i < route.legs.length; i++)
                     {
@@ -87,35 +67,22 @@ public class PathPointServiceImpl implements PathPointService
                                     for (int k = 0; k < step.steps.length; k++)
                                     {
                                         DirectionsStep step1 = step.steps[k];
-                                        EncodedPolyline points1 = step1.polyline;
-                                        if (points1 != null)
+                                        EncodedPolyline encodedPolyline = step1.polyline;
+                                        if (Objects.nonNull(encodedPolyline))
                                         {
-                                            List<com.google.maps.model.LatLng> coords1 = points1.decodePath();
-                                            for (com.google.maps.model.LatLng coord1 : coords1)
-                                            {
-                                                LatLng currentPoint = new LatLng(coord1.lat, coord1.lng);
-                                                // if (getDistanceBetweenPoints(currentPoint, prevPoint) < 50.0)
-                                                // continue;
-                                                path.add(currentPoint);
-                                                prevPoint = currentPoint;
-                                            }
+                                            pathPoints.addAll(GoogleMapsHelper.findEquidistantPointsFromEncodedPolyline(encodedPolyline, prevPoint));
+                                            prevPoint = pathPoints.get(pathPoints.size() - 1);
+
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    EncodedPolyline points = step.polyline;
-                                    if (points != null)
+                                    EncodedPolyline encodedPolyline = step.polyline;
+                                    if (Objects.nonNull(encodedPolyline))
                                     {
-                                        List<com.google.maps.model.LatLng> coords = points.decodePath();
-                                        for (com.google.maps.model.LatLng coord : coords)
-                                        {
-                                            LatLng currentPoint = new LatLng(coord.lat, coord.lng);
-                                            // if (getDistanceBetweenPoints(currentPoint, prevPoint) < 50.0)
-                                            // continue;
-                                            path.add(currentPoint);
-                                            prevPoint = currentPoint;
-                                        }
+                                        pathPoints.addAll(GoogleMapsHelper.findEquidistantPointsFromEncodedPolyline(encodedPolyline, prevPoint));
+                                        prevPoint = pathPoints.get(pathPoints.size() - 1);
                                     }
                                 }
                             }
@@ -126,28 +93,15 @@ public class PathPointServiceImpl implements PathPointService
         }
         catch (Exception ex)
         {
-            ex.printStackTrace();
+            log.error(ex.getMessage());
         }
-        path.add(destination);
-        return path;
-    }
 
-    private double getDistanceBetweenPoints(LatLng currentPoint, LatLng prevPoint)
-    {
-        int R = 6371000;
-        double dLat = toRadians(currentPoint.lat - prevPoint.lat);
-        double dLon = toRadians(currentPoint.lng - prevPoint.lng);
-        double initialLat = toRadians(prevPoint.lat);
-        double finalLat = toRadians(currentPoint.lat);
+        if (!pathPoints.get(pathPoints.size() - 1).equals(destination))
+        {
+            pathPoints.add(destination);
+        }
 
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(initialLat) * Math.cos(finalLat);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    private double toRadians(double deg)
-    {
-        return deg * (Math.PI / 180);
+        return pathPoints;
     }
 
     @Override
@@ -203,10 +157,7 @@ public class PathPointServiceImpl implements PathPointService
 
             }
         }
-        catch (ApiException e)
-        {
-            log.error(e.getMessage());
-        }
+
         catch (Exception e)
         {
             log.error(e.getMessage());

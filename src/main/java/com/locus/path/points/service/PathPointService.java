@@ -6,7 +6,7 @@ import com.google.maps.model.LatLng;
 
 public interface PathPointService
 {
-    List<LatLng> getAllFuzzyPathPoints(LatLng source, LatLng destination);
+    List<LatLng> getAllPointsUsingDirectionApi(LatLng source, LatLng destination);
 
     List<LatLng> getAccurateEquidistantPathPoints(LatLng source, LatLng destination);
 }

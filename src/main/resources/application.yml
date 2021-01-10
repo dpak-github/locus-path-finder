@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: locus-distance-finding-api
+    
+google-maps-api-key: AIzaSyAb8ohmBXqtK4y2_a5CFnFnfLGiOsuwjIo

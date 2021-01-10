@@ -26,6 +26,6 @@ public class MapController
 
         LatLng sourcePoint = new LatLng(Double.parseDouble(source.get(0)), Double.parseDouble(source.get(1)));
         LatLng destinationPoint = new LatLng(Double.parseDouble(destination.get(0)), Double.parseDouble(destination.get(1)));
-        return pathPointService.getAccurateEquidistantPathPoints(sourcePoint, destinationPoint);
+        return pathPointService.getAllPointsUsingDirectionApi(sourcePoint, destinationPoint);
     }
 }
