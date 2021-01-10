@@ -18,4 +18,4 @@ Make sure you replace correct lat lang values for source and destination
 It returns the list of all the intermediate points spaced at 50m from each other on the path that connects them.
 
 ### Alternatively
-visit ~http://localhost:8080/swagger-ui.html~ once you start the application and use the api via ***swagger***
+visit http://localhost:8080/swagger-ui.html once you start the application and use the api via ***swagger***
